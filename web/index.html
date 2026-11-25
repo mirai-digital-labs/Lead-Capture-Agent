@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead Capture Agent — Google Maps & Email Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Lead Capture Agent</h1>
+        <p class="text-slate-400 mt-1">Extract Google Maps businesses, phone numbers, websites &amp; emails automatically.</p>
+      </div>
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 w-fit">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        Zero API Key Required
+      </span>
+    </div>
+
+    <!-- Search Card -->
+    <form id="scrapeForm" class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+        <div class="md:col-span-6">
+          <label for="query" class="block text-sm font-medium text-slate-300 mb-2">Search Query</label>
+          <input
+            id="query"
+            type="text"
+            required
+            placeholder='e.g. "Dentists in Lahore" or "Real Estate in Dubai"'
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+        </div>
+        <div class="md:col-span-2">
+          <label for="limit" class="block text-sm font-medium text-slate-300 mb-2">Max Leads</label>
+          <input
+            id="limit"
+            type="number"
+            min="1"
+            max="50"
+            value="15"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+        </div>
+        <div class="md:col-span-2 flex items-center h-12">
+          <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+            <input id="skipEmails" type="checkbox" class="rounded bg-slate-950 border-slate-700 text-cyan-500 focus:ring-cyan-500" />
+            Skip Email Scan
+          </label>
+        </div>
+        <div class="md:col-span-2">
+          <button
+            id="submitBtn"
+            type="submit"
+            class="w-full rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-3 px-5 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Capture Leads
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Loading Banner -->
+    <div id="loadingBanner" class="hidden bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-8 flex items-center gap-3 text-cyan-300">
+      <svg class="animate-spin h-5 w-5 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+      </svg>
+      <span>Scraping Google Maps &amp; scanning business websites for emails... This may take 30–90 seconds.</span>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="hidden bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 mb-8 text-rose-300"></div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="hidden space-y-6">
+      <!-- Stats & Downloads -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+        <div class="flex gap-8">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400">Total Leads</p>
+            <p id="statTotal" class="text-2xl font-bold text-white">0</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-400">With Emails</p>
+            <p id="statEmails" class="text-2xl font-bold text-emerald-400">0</p>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <a id="downloadXlsx" href="#" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition">
+            Download Excel (.xlsx)
+          </a>
+          <a id="downloadCsv" href="#" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 transition">
+            Download CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-950/80 text-slate-400 uppercase text-xs border-b border-slate-800">
+              <tr>
+                <th class="px-4 py-3.5">Business</th>
+                <th class="px-4 py-3.5">Category</th>
+                <th class="px-4 py-3.5">Phone</th>
+                <th class="px-4 py-3.5">Emails</th>
+                <th class="px-4 py-3.5">Website</th>
+                <th class="px-4 py-3.5">Rating</th>
+              </tr>
+            </thead>
+            <tbody id="leadsTableBody" class="divide-y divide-slate-800/70"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("scrapeForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const loadingBanner = document.getElementById("loadingBanner");
+    const errorBanner = document.getElementById("errorBanner");
+    const resultsSection = document.getElementById("resultsSection");
+    const tbody = document.getElementById("leadsTableBody");
+
+    function escapeHtml(str) {
+      return (str || "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const query = document.getElementById("query").value.trim();
+      const limit = parseInt(document.getElementById("limit").value, 10) || 15;
+      const skip_emails = document.getElementById("skipEmails").checked;
+
+      errorBanner.classList.add("hidden");
+      resultsSection.classList.add("hidden");
+      loadingBanner.classList.remove("hidden");
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch("/api/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, limit, skip_emails }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server error (${res.status})`);
+        }
+
+        const data = await res.json();
+        if (!data.leads || data.leads.length === 0) {
+          errorBanner.textContent = "No leads found for this query. Try a broader search.";
+          errorBanner.classList.remove("hidden");
+          return;
+        }
+
+        document.getElementById("statTotal").textContent = data.total;
+        document.getElementById("statEmails").textContent = data.emails_found;
+        document.getElementById("downloadXlsx").href = `/api/download/${encodeURIComponent(data.xlsx_file)}`;
+        document.getElementById("downloadCsv").href = `/api/download/${encodeURIComponent(data.csv_file)}`;
+
+        tbody.innerHTML = data.leads.map((lead) => `
+          <tr class="hover:bg-slate-800/40">
+            <td class="px-4 py-3 font-medium text-white">
+              ${lead.maps_url ? `<a href="${escapeHtml(lead.maps_url)}" target="_blank" class="hover:text-cyan-400 underline decoration-slate-700">${escapeHtml(lead.name)}</a>` : escapeHtml(lead.name)}
+            </td>
+            <td class="px-4 py-3 text-slate-400">${escapeHtml(lead.category) || "-"}</td>
+            <td class="px-4 py-3 text-emerald-400 whitespace-nowrap">${escapeHtml(lead.phone) || "-"}</td>
+            <td class="px-4 py-3 text-amber-300">${escapeHtml(lead.emails) || "-"}</td>
+            <td class="px-4 py-3 text-cyan-400 max-w-xs truncate">
+              ${lead.website ? `<a href="${escapeHtml(lead.website)}" target="_blank" class="hover:underline">${escapeHtml(lead.website)}</a>` : "-"}
+            </td>
+            <td class="px-4 py-3 text-slate-300 whitespace-nowrap">${lead.rating ? `${escapeHtml(lead.rating)} (${escapeHtml(lead.reviews || "0")})` : "-"}</td>
+          </tr>
+        `).join("");
+
+        resultsSection.classList.remove("hidden");
+      } catch (err) {
+        errorBanner.textContent = err.message || "Something went wrong while capturing leads.";
+        errorBanner.classList.remove("hidden");
+      } finally {
+        loadingBanner.classList.add("hidden");
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
