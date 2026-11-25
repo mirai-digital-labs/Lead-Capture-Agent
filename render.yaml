@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: lead-capture-agent
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: SERPER_API_KEY
+        sync: false
