@@ -27,6 +27,11 @@ COLUMNS = [
     ("instagram", "Instagram"),
     ("linkedin", "LinkedIn"),
     ("maps_url", "Google Maps URL"),
+    ("lead_score", "Lead Score"),
+    ("priority", "Priority"),
+    ("ai_summary", "AI Insight"),
+    ("cold_email", "Cold Email"),
+    ("whatsapp_pitch", "WhatsApp Pitch"),
 ]
 
 
