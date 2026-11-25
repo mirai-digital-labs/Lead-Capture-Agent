@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 import httpx
 from pydantic import BaseModel, Field
 
+from db import clear_saved_leads, get_saved_leads, get_seen_urls, init_db, save_search_and_leads
 from exporter import deduplicate_leads, export_leads
 from scraper.ai_assistant import analyze_leads_with_ai
 from scraper.email_extractor import enrich_leads
@@ -20,7 +21,8 @@ from scraper.maps_scraper import build_search_query, fetch_maps_leads
 
 load_dotenv()
 
-app = FastAPI(title="Lead Capture Agent", version="1.2.0")
+app = FastAPI(title="Lead Capture Agent", version="1.3.0")
+init_db()
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -61,6 +63,8 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
 
         all_leads = []
         seen_urls = {u.split("?")[0].strip().lower() for u in payload.exclude_urls if u}
+        if payload.exclude_urls:
+            seen_urls.update(get_seen_urls())
 
         for city_idx, city_name in enumerate(cities, start=1):
             full_query = build_search_query(payload.query, city_name, payload.country)
@@ -122,6 +126,7 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
         )
 
         export_label = build_search_query(payload.query, "_".join(cities) if any(cities) else "", payload.country)
+        save_search_and_leads(payload.query, payload.country, payload.city, leads)
         csv_path, xlsx_path = export_leads(leads, query=export_label, output_dir=OUTPUT_DIR)
         emails_found = sum(1 for lead in leads if lead.emails)
 
@@ -190,6 +195,18 @@ async def send_to_webhook(payload: WebhookRequest) -> dict[str, Any]:
             return {"status": "sent", "sent_count": len(payload.leads), "remote_status": resp.status_code}
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Webhook delivery failed: {exc}") from exc
+
+
+@app.get("/api/leads")
+async def list_saved_leads() -> dict[str, Any]:
+    rows = get_saved_leads(limit=500)
+    return {"total": len(rows), "leads": rows}
+
+
+@app.delete("/api/leads")
+async def delete_saved_leads() -> dict[str, str]:
+    clear_saved_leads()
+    return {"status": "cleared"}
 
 
 @app.get("/api/download/{filename}")
