@@ -6,10 +6,31 @@ import asyncio
 import re
 from urllib.parse import urljoin, urlparse
 
+import dns.asyncresolver
 import httpx
 from bs4 import BeautifulSoup
 
 from scraper.maps_scraper import Lead
+
+_MX_CACHE: dict[str, bool] = {}
+
+
+async def verify_email_domain(email: str) -> bool:
+    """Check whether the email's domain has valid MX records (cached per domain)."""
+    domain = email.split("@")[-1].strip().lower()
+    if not domain:
+        return False
+    if domain in _MX_CACHE:
+        return _MX_CACHE[domain]
+    try:
+        resolver = dns.asyncresolver.Resolver()
+        resolver.lifetime = 4.0
+        answers = await resolver.resolve(domain, "MX")
+        has_mx = len(answers) > 0
+    except Exception:
+        has_mx = False
+    _MX_CACHE[domain] = has_mx
+    return has_mx
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
@@ -126,7 +147,13 @@ async def enrich_single_lead(
         except Exception:
             pass
 
-        lead.emails = ", ".join(sorted(all_emails))
+        sorted_emails = sorted(all_emails)
+        lead.emails = ", ".join(sorted_emails)
+        if sorted_emails:
+            checks = await asyncio.gather(*(verify_email_domain(e) for e in sorted_emails))
+            lead.email_status = "Verified" if any(checks) else "Unverified"
+        else:
+            lead.email_status = ""
         lead.facebook = socials.get("facebook", "")
         lead.instagram = socials.get("instagram", "")
         lead.linkedin = socials.get("linkedin", "")
