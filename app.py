@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from exporter import deduplicate_leads, export_leads
+from scraper.ai_assistant import analyze_leads_with_ai
 from scraper.email_extractor import enrich_leads
 from scraper.maps_scraper import build_search_query, fetch_maps_leads
 
@@ -30,9 +31,11 @@ JOBS: dict[str, dict[str, Any]] = {}
 class ScrapeRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=150)
     country: str = Field(default="", max_length=80)
-    city: str = Field(default="", max_length=80)
+    city: str = Field(default="", max_length=150)
     limit: int = Field(default=15, ge=1, le=50)
     skip_emails: bool = Field(default=False)
+    offer: str = Field(default="", max_length=300)
+    gemini_api_key: str = Field(default="", max_length=200)
     exclude_urls: list[str] = Field(default_factory=list)
 
 
@@ -102,6 +105,20 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
                 job["message"] = f"Scanning websites ({done_count}/{len(leads)}): {name}"
 
             await enrich_leads(leads, on_progress=on_email_progress)
+
+        ai_count = 0
+
+        def on_ai_progress(name: str) -> None:
+            nonlocal ai_count
+            ai_count += 1
+            job["message"] = f"AI Assistant analyzing ({ai_count}/{len(leads)}): {name}"
+
+        await analyze_leads_with_ai(
+            leads,
+            offer=payload.offer,
+            api_key=payload.gemini_api_key,
+            on_progress=on_ai_progress,
+        )
 
         export_label = build_search_query(payload.query, "_".join(cities) if any(cities) else "", payload.country)
         csv_path, xlsx_path = export_leads(leads, query=export_label, output_dir=OUTPUT_DIR)
