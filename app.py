@@ -52,23 +52,35 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
     job = JOBS[job_id]
     try:
         job["status"] = "running"
-        full_query = build_search_query(payload.query, payload.city, payload.country)
-        job["message"] = f"Searching Google Maps for '{full_query}'..."
+        cities = [c.strip() for c in payload.city.split(",") if c.strip()] or [""]
+        cities = cities[:5]  # Cap to 5 cities per job to protect container memory
 
-        def on_maps_progress(idx: int, total: int, name: str) -> None:
-            job["message"] = f"Maps ({idx}/{total}): {name}"
+        all_leads = []
+        seen_urls = {u.split("?")[0].strip().lower() for u in payload.exclude_urls if u}
 
-        leads = await fetch_maps_leads(
-            query=payload.query.strip(),
-            limit=payload.limit,
-            headless=True,
-            country=payload.country.strip(),
-            city=payload.city.strip(),
-            exclude_urls=set(payload.exclude_urls),
-            on_progress=on_maps_progress,
-        )
+        for city_idx, city_name in enumerate(cities, start=1):
+            full_query = build_search_query(payload.query, city_name, payload.country)
+            prefix = f"[City {city_idx}/{len(cities)}: {city_name}] " if city_name else ""
+            job["message"] = f"{prefix}Searching Google Maps for '{full_query}'..."
 
-        if not leads:
+            def on_maps_progress(idx: int, total: int, name: str, _prefix: str = prefix) -> None:
+                job["message"] = f"{_prefix}Maps ({idx}/{total}): {name}"
+
+            city_leads = await fetch_maps_leads(
+                query=payload.query.strip(),
+                limit=payload.limit,
+                headless=True,
+                country=payload.country.strip(),
+                city=city_name,
+                exclude_urls=seen_urls,
+                on_progress=on_maps_progress,
+            )
+            for lead in city_leads:
+                if lead.maps_url:
+                    seen_urls.add(lead.maps_url.split("?")[0].strip().lower())
+            all_leads.extend(city_leads)
+
+        if not all_leads:
             job["status"] = "done"
             job["result"] = {
                 "total": 0,
@@ -79,7 +91,7 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
             }
             return
 
-        leads = deduplicate_leads(leads)
+        leads = deduplicate_leads(all_leads)
 
         if not payload.skip_emails:
             done_count = 0
@@ -91,7 +103,8 @@ async def _run_scrape_job(job_id: str, payload: ScrapeRequest) -> None:
 
             await enrich_leads(leads, on_progress=on_email_progress)
 
-        csv_path, xlsx_path = export_leads(leads, query=full_query, output_dir=OUTPUT_DIR)
+        export_label = build_search_query(payload.query, "_".join(cities) if any(cities) else "", payload.country)
+        csv_path, xlsx_path = export_leads(leads, query=export_label, output_dir=OUTPUT_DIR)
         emails_found = sum(1 for lead in leads if lead.emails)
 
         job["status"] = "done"
