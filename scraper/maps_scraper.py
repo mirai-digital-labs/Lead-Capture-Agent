@@ -39,13 +39,24 @@ def _clean_text(value: Optional[str]) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-async def scrape_google_maps_serper(query: str, limit: int = 20, api_key: str = "") -> list[Lead]:
+def _normalize_url_key(url: str) -> str:
+    """Strip query/fragment noise from Google Maps place URLs for reliable deduplication."""
+    return url.split("?")[0].strip().lower()
+
+
+async def scrape_google_maps_serper(
+    query: str,
+    limit: int = 20,
+    api_key: str = "",
+    exclude_urls: set[str] | None = None,
+) -> list[Lead]:
     """Fetch Google Maps places via Serper.dev API when an API key is provided."""
     leads: list[Lead] = []
+    excluded = exclude_urls or set()
     page_num = 1
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        while len(leads) < limit:
+        while len(leads) < limit and page_num <= 10:
             resp = await client.post(
                 "https://google.serper.dev/maps",
                 headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
@@ -57,6 +68,13 @@ async def scrape_google_maps_serper(query: str, limit: int = 20, api_key: str = 
                 break
 
             for place in places:
+                maps_url = (
+                    f"https://www.google.com/maps/place/?q=place_id:{place.get('placeId', '')}"
+                    if place.get("placeId")
+                    else ""
+                )
+                if maps_url and _normalize_url_key(maps_url) in excluded:
+                    continue
                 leads.append(
                     Lead(
                         name=_clean_text(place.get("title")),
@@ -66,9 +84,7 @@ async def scrape_google_maps_serper(query: str, limit: int = 20, api_key: str = 
                         phone=_clean_text(place.get("phoneNumber")),
                         website=_clean_text(place.get("website")),
                         address=_clean_text(place.get("address")),
-                        maps_url=f"https://www.google.com/maps/place/?q=place_id:{place.get('placeId', '')}"
-                        if place.get("placeId")
-                        else "",
+                        maps_url=maps_url,
                     )
                 )
                 if len(leads) >= limit:
@@ -97,19 +113,16 @@ async def _extract_place_details(page: Page, url: str) -> Lead:
     lead = Lead(maps_url=url)
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=25000)
-        await page.wait_for_timeout(1500)
+        await page.wait_for_timeout(1200)
 
-        # Business Name
         h1 = page.locator("h1.DUwDvf")
         if await h1.count() > 0:
             lead.name = _clean_text(await h1.first.inner_text())
 
-        # Category
         cat_btn = page.locator("button.DkEaL")
         if await cat_btn.count() > 0:
             lead.category = _clean_text(await cat_btn.first.inner_text())
 
-        # Rating & Reviews
         rating_el = page.locator("div.F7nice span[aria-hidden='true']")
         if await rating_el.count() > 0:
             lead.rating = _clean_text(await rating_el.first.inner_text())
@@ -121,17 +134,14 @@ async def _extract_place_details(page: Page, url: str) -> Lead:
             if match:
                 lead.reviews = match.group(1)
 
-        # Address
         addr_btn = page.locator("button[data-item-id='address']")
         if await addr_btn.count() > 0:
             lead.address = _clean_text(await addr_btn.first.inner_text())
 
-        # Phone
         phone_btn = page.locator("button[data-item-id^='phone:tel:']")
         if await phone_btn.count() > 0:
             lead.phone = _clean_text(await phone_btn.first.inner_text())
 
-        # Website
         web_link = page.locator("a[data-item-id='authority']")
         if await web_link.count() > 0:
             href = await web_link.first.get_attribute("href")
@@ -146,14 +156,28 @@ async def scrape_google_maps_browser(
     query: str,
     limit: int = 20,
     headless: bool = True,
+    exclude_urls: set[str] | None = None,
     on_progress=None,
 ) -> list[Lead]:
     """Scrape Google Maps directly using Playwright Chromium (free, no API key required)."""
     search_url = f"https://www.google.com/maps/search/{quote_plus(query)}?hl=en"
     place_urls: list[str] = []
+    excluded = {_normalize_url_key(u) for u in (exclude_urls or set()) if u}
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
+        browser = await p.chromium.launch(
+            headless=headless,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--mute-audio",
+            ],
+        )
         context = await browser.new_context(
             locale="en-US",
             viewport={"width": 1280, "height": 900},
@@ -167,32 +191,37 @@ async def scrape_google_maps_browser(
         await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
         await _handle_consent_if_present(page)
 
-        # Wait for results feed
         feed = page.locator("div[role='feed']")
         try:
             await feed.wait_for(state="visible", timeout=15000)
         except Exception:
-            if "/maps/place/" in page.url:
+            if "/maps/place/" in page.url and _normalize_url_key(page.url) not in excluded:
                 lead = await _extract_place_details(page, page.url)
                 await browser.close()
                 return [lead] if lead.name else []
             await browser.close()
             return []
 
-        # Scroll feed to collect place URLs up to `limit`
+        # Scroll feed and skip already-captured URLs so repeat searches return NEW leads
         seen: set[str] = set()
         stagnant_rounds = 0
-        while len(place_urls) < limit and stagnant_rounds < 5:
-            prev_count = len(place_urls)
+        while len(place_urls) < limit and stagnant_rounds < 6:
+            prev_seen_count = len(seen)
             anchors = page.locator("div[role='feed'] a.hfpxzc")
             count = await anchors.count()
             for idx in range(count):
                 href = await anchors.nth(idx).get_attribute("href")
-                if href and "/maps/place/" in href and href not in seen:
-                    seen.add(href)
-                    place_urls.append(href)
-                    if len(place_urls) >= limit:
-                        break
+                if not href or "/maps/place/" not in href:
+                    continue
+                norm = _normalize_url_key(href)
+                if norm in seen:
+                    continue
+                seen.add(norm)
+                if norm in excluded:
+                    continue
+                place_urls.append(href)
+                if len(place_urls) >= limit:
+                    break
 
             if len(place_urls) >= limit:
                 break
@@ -202,9 +231,9 @@ async def scrape_google_maps_browser(
                 break
 
             await feed.evaluate("el => el.scrollBy(0, 1800)")
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(1400)
 
-            if len(place_urls) == prev_count:
+            if len(seen) == prev_seen_count:
                 stagnant_rounds += 1
             else:
                 stagnant_rounds = 0
@@ -225,15 +254,22 @@ async def fetch_maps_leads(
     query: str,
     limit: int = 20,
     headless: bool = True,
+    exclude_urls: set[str] | None = None,
     on_progress=None,
 ) -> list[Lead]:
     """Use Serper API if SERPER_API_KEY is configured, otherwise free Playwright scraper."""
     api_key = os.getenv("SERPER_API_KEY", "").strip()
     if api_key:
-        return await scrape_google_maps_serper(query=query, limit=limit, api_key=api_key)
+        return await scrape_google_maps_serper(
+            query=query,
+            limit=limit,
+            api_key=api_key,
+            exclude_urls=exclude_urls,
+        )
     return await scrape_google_maps_browser(
         query=query,
         limit=limit,
         headless=headless,
+        exclude_urls=exclude_urls,
         on_progress=on_progress,
     )
