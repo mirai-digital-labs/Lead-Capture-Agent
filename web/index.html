@@ -3,26 +3,67 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lead Capture Agent — Google Maps & Email Extractor</title>
+  <title>Lead Capture Agent — Google Maps & AI Lead Platform</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+  <!-- Auth Screen -->
+  <div id="authScreen" class="hidden min-h-screen flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-8 shadow-2xl space-y-6">
+      <div class="text-center">
+        <h1 class="text-2xl font-bold text-white">Lead Capture Agent</h1>
+        <p class="text-sm text-slate-400 mt-1">Sign in or create an account to start capturing leads.</p>
+      </div>
+      <div class="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+        <button id="tabLogin" type="button" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-slate-950">Login</button>
+        <button id="tabRegister" type="button" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400">Sign Up</button>
+      </div>
+      <form id="authForm" class="space-y-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-1.5">Email</label>
+          <input id="authEmail" type="email" required placeholder="you@company.com" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1.5">Password (min 6 chars)</label>
+          <input id="authPassword" type="password" required minlength="6" placeholder="••••••••" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+        </div>
+        <div id="authError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2.5"></div>
+        <button id="authSubmitBtn" type="submit" class="w-full rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-2.5 transition">
+          Login
+        </button>
+      </form>
+      <p class="text-xs text-slate-500 text-center">First account created automatically becomes Admin (99,999 credits). New users get 50 free credits.</p>
+    </div>
+  </div>
+
+  <!-- Main App Screen -->
+  <div id="appScreen" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white">Lead Capture Agent</h1>
-        <p class="text-slate-400 mt-1">Extract Google Maps businesses, phone numbers, websites &amp; emails by country and city.</p>
+        <p class="text-slate-400 mt-1">AI-powered Google Maps, Email Verification &amp; Outreach Platform.</p>
       </div>
-      <div class="flex items-center gap-3 flex-wrap">
-        <span id="savedBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-          Saved History: <strong id="savedCount">0</strong> leads
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <span id="userEmailBadge" class="px-3 py-1 rounded-full text-xs font-medium bg-slate-900 text-slate-300 border border-slate-700"></span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+          Credits: <strong id="creditsCount">0</strong>
+        </span>
+        <span class="px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+          Saved: <strong id="savedCount">0</strong>
         </span>
         <button id="downloadAllBtn" type="button" class="hidden px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition">
-          Download All Saved (CSV)
+          Download All (CSV)
         </button>
         <button id="clearHistoryBtn" type="button" class="hidden px-3 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/25 hover:bg-rose-500/20 transition">
-          Clear History
+          Clear
+        </button>
+        <button id="adminBtn" type="button" class="hidden px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/25 transition">
+          Admin Top-Up
+        </button>
+        <button id="logoutBtn" type="button" class="px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition">
+          Logout
         </button>
       </div>
     </div>
@@ -32,20 +73,11 @@
       <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div class="md:col-span-5">
           <label for="query" class="block text-sm font-medium text-slate-300 mb-2">Business / Niche</label>
-          <input
-            id="query"
-            type="text"
-            required
-            placeholder='e.g. "Factory gloves", "Dentists", "Real Estate"'
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <input id="query" type="text" required placeholder='e.g. "Factory gloves", "Dentists", "Real Estate"' class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
         <div class="md:col-span-3">
           <label for="country" class="block text-sm font-medium text-slate-300 mb-2">Country</label>
-          <select
-            id="country"
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          >
+          <select id="country" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
             <option value="">Any / Worldwide</option>
             <option value="United States">United States (USA)</option>
             <option value="United Kingdom">United Kingdom (UK)</option>
@@ -64,44 +96,22 @@
         </div>
         <div class="md:col-span-3">
           <label for="city" class="block text-sm font-medium text-slate-300 mb-2">City / Cities (comma-separated)</label>
-          <input
-            id="city"
-            type="text"
-            placeholder='e.g. "New York, Chicago, Houston"'
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <input id="city" type="text" placeholder='e.g. "New York, Chicago, Houston"' class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
         <div class="md:col-span-1">
           <label for="limit" class="block text-sm font-medium text-slate-300 mb-2">Per City</label>
-          <input
-            id="limit"
-            type="number"
-            min="1"
-            max="50"
-            value="10"
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <input id="limit" type="number" min="1" max="50" value="10" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div class="md:col-span-7">
           <label for="offer" class="block text-sm font-medium text-slate-300 mb-2">Your Offer / Service (for AI Cold Email &amp; WhatsApp Pitch)</label>
-          <input
-            id="offer"
-            type="text"
-            placeholder='e.g. "We supply wholesale nitrile & leather safety gloves at factory prices"'
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <input id="offer" type="text" placeholder='e.g. "We supply wholesale nitrile & leather safety gloves at factory prices"' class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
         <div class="md:col-span-5">
           <label for="geminiKey" class="block text-sm font-medium text-slate-300 mb-2">Gemini AI Key (Optional — saved in your browser)</label>
-          <input
-            id="geminiKey"
-            type="password"
-            placeholder="AIza... (leave empty for built-in smart templates)"
-            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <input id="geminiKey" type="password" placeholder="AIza... (leave empty for built-in smart templates)" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
       </div>
 
@@ -116,11 +126,7 @@
             Skip Email Scan (Faster)
           </label>
         </div>
-        <button
-          id="submitBtn"
-          type="submit"
-          class="rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-2.5 px-7 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <button id="submitBtn" type="submit" class="rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-2.5 px-7 transition disabled:opacity-50 disabled:cursor-not-allowed">
           Capture Leads
         </button>
       </div>
@@ -156,29 +162,15 @@
           </label>
         </div>
         <div class="flex flex-wrap gap-3">
-          <a id="downloadXlsx" href="#" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition">
-            Download Excel (.xlsx)
-          </a>
-          <a id="downloadCsv" href="#" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 transition">
-            Download CSV
-          </a>
-          <button id="openWebhookBtn" type="button" class="px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-semibold text-sm border border-indigo-500/40 transition">
-            Send to Webhook / CRM
-          </button>
+          <a id="downloadXlsx" href="#" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition">Download Excel (.xlsx)</a>
+          <a id="downloadCsv" href="#" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 transition">Download CSV</a>
+          <button id="openWebhookBtn" type="button" class="px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-semibold text-sm border border-indigo-500/40 transition">Send to Webhook / CRM</button>
         </div>
       </div>
 
-      <!-- Webhook Sync Bar -->
       <div id="webhookBar" class="hidden bg-slate-900/80 border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 items-center">
-        <input
-          id="webhookUrl"
-          type="url"
-          placeholder="Paste n8n / Zapier / Make / Google Sheets Webhook URL (https://...)"
-          class="flex-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <button id="sendWebhookBtn" type="button" class="px-5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-sm transition whitespace-nowrap">
-          Push Leads Now
-        </button>
+        <input id="webhookUrl" type="url" placeholder="Paste n8n / Zapier / Make / Google Sheets Webhook URL (https://...)" class="flex-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <button id="sendWebhookBtn" type="button" class="px-5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-sm transition whitespace-nowrap">Push Leads Now</button>
         <span id="webhookStatus" class="text-xs text-slate-300"></span>
       </div>
 
@@ -227,11 +219,117 @@
     </div>
   </div>
 
+  <!-- Admin Top-Up Modal -->
+  <div id="adminModal" class="hidden fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Admin — Grant User Credits</h3>
+        <button id="closeAdminBtn" type="button" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+      <input id="adminTargetEmail" type="email" placeholder="User email" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100" />
+      <input id="adminAddAmount" type="number" min="1" value="100" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100" />
+      <p id="adminMsg" class="text-xs text-slate-300"></p>
+      <button id="adminGrantBtn" type="button" class="w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold py-2.5 text-sm">Add Credits</button>
+    </div>
+  </div>
+
   <script>
+    const TOKEN_KEY = "lead_capture_auth_token";
     const STORAGE_KEY = "lead_capture_agent_history_v1";
     const GEMINI_STORAGE_KEY = "lead_capture_agent_gemini_key";
     const OFFER_STORAGE_KEY = "lead_capture_agent_offer";
     const WEBHOOK_STORAGE_KEY = "lead_capture_agent_webhook_url";
+
+    let authMode = "login";
+    let currentUser = null;
+    let currentLeads = [];
+
+    const authScreen = document.getElementById("authScreen");
+    const appScreen = document.getElementById("appScreen");
+    const tabLogin = document.getElementById("tabLogin");
+    const tabRegister = document.getElementById("tabRegister");
+    const authForm = document.getElementById("authForm");
+    const authError = document.getElementById("authError");
+    const authSubmitBtn = document.getElementById("authSubmitBtn");
+
+    function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+    function authHeaders() { return { "Authorization": `Bearer ${getToken()}`, "Content-Type": "application/json" }; }
+
+    function setAuthTab(mode) {
+      authMode = mode;
+      tabLogin.className = mode === "login" ? "flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-slate-950" : "flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400";
+      tabRegister.className = mode === "register" ? "flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-slate-950" : "flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400";
+      authSubmitBtn.textContent = mode === "login" ? "Login" : "Create Account";
+      authError.classList.add("hidden");
+    }
+    tabLogin.addEventListener("click", () => setAuthTab("login"));
+    tabRegister.addEventListener("click", () => setAuthTab("register"));
+
+    authForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      authError.classList.add("hidden");
+      const email = document.getElementById("authEmail").value.trim();
+      const password = document.getElementById("authPassword").value;
+      const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Authentication failed");
+        localStorage.setItem(TOKEN_KEY, data.token);
+        enterApp(data.user);
+      } catch (err) {
+        authError.textContent = err.message;
+        authError.classList.remove("hidden");
+      }
+    });
+
+    function enterApp(user) {
+      currentUser = user;
+      authScreen.classList.add("hidden");
+      appScreen.classList.remove("hidden");
+      document.getElementById("userEmailBadge").textContent = user.email;
+      document.getElementById("creditsCount").textContent = user.credits;
+      document.getElementById("adminBtn").classList.toggle("hidden", !user.is_admin);
+      refreshHistoryUI();
+      syncServerHistory();
+    }
+
+    async function checkSession() {
+      const token = getToken();
+      if (!token) { authScreen.classList.remove("hidden"); return; }
+      try {
+        const res = await fetch("/api/auth/me", { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        enterApp(data.user);
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        authScreen.classList.remove("hidden");
+      }
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem(TOKEN_KEY);
+      location.reload();
+    });
+
+    // Admin Modal
+    const adminModal = document.getElementById("adminModal");
+    document.getElementById("adminBtn").addEventListener("click", () => adminModal.classList.remove("hidden"));
+    document.getElementById("closeAdminBtn").addEventListener("click", () => adminModal.classList.add("hidden"));
+    document.getElementById("adminGrantBtn").addEventListener("click", async () => {
+      const email = document.getElementById("adminTargetEmail").value.trim();
+      const add_credits = parseInt(document.getElementById("adminAddAmount").value, 10) || 100;
+      const msg = document.getElementById("adminMsg");
+      const res = await fetch("/api/admin/credits", { method: "POST", headers: authHeaders(), body: JSON.stringify({ email, add_credits }) });
+      const data = await res.json();
+      msg.textContent = res.ok ? `Updated ${data.email} -> ${data.credits} credits` : (data.detail || "Failed");
+    });
+
     const form = document.getElementById("scrapeForm");
     const submitBtn = document.getElementById("submitBtn");
     const loadingBanner = document.getElementById("loadingBanner");
@@ -255,49 +353,31 @@
     const sendWebhookBtn = document.getElementById("sendWebhookBtn");
     webhookUrlInput.value = localStorage.getItem(WEBHOOK_STORAGE_KEY) || "";
 
-    document.getElementById("openWebhookBtn").addEventListener("click", () => {
-      webhookBar.classList.toggle("hidden");
-    });
+    document.getElementById("closeModalBtn").addEventListener("click", () => pitchModal.classList.add("hidden"));
+    document.getElementById("copyEmailBtn").addEventListener("click", () => navigator.clipboard.writeText(document.getElementById("modalEmail").textContent));
+    document.getElementById("copyWaBtn").addEventListener("click", () => navigator.clipboard.writeText(document.getElementById("modalWa").textContent));
+    document.getElementById("openWebhookBtn").addEventListener("click", () => webhookBar.classList.toggle("hidden"));
 
     sendWebhookBtn.addEventListener("click", async () => {
       const webhook_url = webhookUrlInput.value.trim();
-      if (!webhook_url) {
-        webhookStatus.textContent = "Please enter a valid Webhook URL.";
-        webhookStatus.className = "text-xs text-rose-400";
-        return;
-      }
+      if (!webhook_url) { webhookStatus.textContent = "Please enter a valid Webhook URL."; return; }
       localStorage.setItem(WEBHOOK_STORAGE_KEY, webhook_url);
       sendWebhookBtn.disabled = true;
       webhookStatus.textContent = "Sending...";
-      webhookStatus.className = "text-xs text-cyan-300";
       try {
         const res = await fetch("/api/webhook", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            webhook_url,
-            query: document.getElementById("query").value.trim(),
-            leads: currentLeads,
-          }),
+          headers: authHeaders(),
+          body: JSON.stringify({ webhook_url, query: document.getElementById("query").value.trim(), leads: currentLeads }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Failed");
         webhookStatus.textContent = `Sent ${data.sent_count} leads!`;
-        webhookStatus.className = "text-xs text-emerald-400";
       } catch (err) {
         webhookStatus.textContent = err.message || "Failed to send.";
-        webhookStatus.className = "text-xs text-rose-400";
       } finally {
         sendWebhookBtn.disabled = false;
       }
-    });
-
-    document.getElementById("closeModalBtn").addEventListener("click", () => pitchModal.classList.add("hidden"));
-    document.getElementById("copyEmailBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(document.getElementById("modalEmail").textContent);
-    });
-    document.getElementById("copyWaBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(document.getElementById("modalWa").textContent);
     });
 
     window.openPitchModal = (idx) => {
@@ -310,37 +390,24 @@
       pitchModal.classList.remove("hidden");
     };
 
-    let currentLeads = [];
-
-    function getHistory() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      } catch {
-        return [];
-      }
-    }
+    function getHistory() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
 
     function saveToHistory(newLeads) {
       const existing = getHistory();
       const seen = new Set(existing.map((l) => (l.maps_url || l.name).split("?")[0].toLowerCase()));
       for (const lead of newLeads) {
         const key = (lead.maps_url || lead.name || "").split("?")[0].toLowerCase();
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          existing.push(lead);
-        }
+        if (key && !seen.has(key)) { seen.add(key); existing.push(lead); }
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
       refreshHistoryUI();
-    syncServerHistory();
     }
 
     function refreshHistoryUI() {
       const history = getHistory();
       savedCountEl.textContent = history.length;
-      const hasData = history.length > 0;
-      downloadAllBtn.classList.toggle("hidden", !hasData);
-      clearHistoryBtn.classList.toggle("hidden", !hasData);
+      downloadAllBtn.classList.toggle("hidden", !history.length);
+      clearHistoryBtn.classList.toggle("hidden", !history.length);
     }
 
     downloadAllBtn.addEventListener("click", () => {
@@ -349,9 +416,7 @@
       const headers = ["Business Name", "Category", "Phone", "Emails", "Email Status", "Website", "Rating", "Reviews", "Address", "Lead Score", "Priority", "AI Insight", "Cold Email", "WhatsApp Pitch", "Facebook", "Instagram", "LinkedIn", "Google Maps URL"];
       const fields = ["name", "category", "phone", "emails", "email_status", "website", "rating", "reviews", "address", "lead_score", "priority", "ai_summary", "cold_email", "whatsapp_pitch", "facebook", "instagram", "linkedin", "maps_url"];
       const csvRows = [headers.join(",")];
-      for (const item of history) {
-        csvRows.push(fields.map((f) => `"${String(item[f] || "").replace(/"/g, '""')}"`).join(","));
-      }
+      for (const item of history) csvRows.push(fields.map((f) => `"${String(item[f] || "").replace(/"/g, '""')}"`).join(","));
       const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -364,80 +429,52 @@
     clearHistoryBtn.addEventListener("click", async () => {
       if (confirm("Clear all saved leads history?")) {
         localStorage.removeItem(STORAGE_KEY);
-        try { await fetch("/api/leads", { method: "DELETE" }); } catch {}
+        try { await fetch("/api/leads", { method: "DELETE", headers: { "Authorization": `Bearer ${getToken()}` } }); } catch {}
         refreshHistoryUI();
-    syncServerHistory();
       }
     });
 
     async function syncServerHistory() {
       try {
-        const res = await fetch("/api/leads");
+        const res = await fetch("/api/leads", { headers: { "Authorization": `Bearer ${getToken()}` } });
         if (res.ok) {
           const data = await res.json();
-          if (data.leads && data.leads.length > 0) {
-            saveToHistory(data.leads);
-          }
+          if (data.leads && data.leads.length > 0) saveToHistory(data.leads);
         }
       } catch {}
     }
 
     function escapeHtml(str) {
-      return (str || "").replace(/[&<>"']/g, (c) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      }[c]));
+      return (str || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
 
     function renderTable() {
       const onlyEmail = filterEmailOnly.checked;
-      const visible = currentLeads
-        .map((lead, idx) => ({ lead, idx }))
-        .filter(({ lead }) => !onlyEmail || (lead.emails && lead.emails.trim()));
-
+      const visible = currentLeads.map((lead, idx) => ({ lead, idx })).filter(({ lead }) => !onlyEmail || (lead.emails && lead.emails.trim()));
       tbody.innerHTML = visible.map(({ lead, idx }) => {
-        const badgeClass = lead.priority === "Hot"
-          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-          : lead.priority === "Warm"
-          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-          : "bg-slate-800 text-slate-300 border-slate-700";
-
+        const badgeClass = lead.priority === "Hot" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : lead.priority === "Warm" ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-slate-800 text-slate-300 border-slate-700";
         return `
         <tr class="hover:bg-slate-800/40">
           <td class="px-4 py-3 font-medium text-white">
             ${lead.maps_url ? `<a href="${escapeHtml(lead.maps_url)}" target="_blank" class="hover:text-cyan-400 underline decoration-slate-700">${escapeHtml(lead.name)}</a>` : escapeHtml(lead.name)}
             <div class="text-xs text-slate-400 mt-0.5">${escapeHtml(lead.category) || ""}</div>
           </td>
-          <td class="px-4 py-3 whitespace-nowrap">
-            <span class="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badgeClass}">
-              ${escapeHtml(lead.priority || "Lead")} ${escapeHtml(lead.lead_score || "")}
-            </span>
-          </td>
+          <td class="px-4 py-3 whitespace-nowrap"><span class="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badgeClass}">${escapeHtml(lead.priority || "Lead")} ${escapeHtml(lead.lead_score || "")}</span></td>
           <td class="px-4 py-3 text-emerald-400 whitespace-nowrap">${escapeHtml(lead.phone) || "-"}</td>
           <td class="px-4 py-3 text-amber-300">
             <div>${escapeHtml(lead.emails) || "-"}</div>
-            ${lead.email_status === "Verified"
-              ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">MX Verified</span>`
-              : lead.email_status === "Unverified"
-              ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">Unverified</span>`
-              : ""}
+            ${lead.email_status === "Verified" ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">MX Verified</span>` : lead.email_status === "Unverified" ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">Unverified</span>` : ""}
           </td>
-          <td class="px-4 py-3 text-cyan-400 max-w-xs truncate">
-            ${lead.website ? `<a href="${escapeHtml(lead.website)}" target="_blank" class="hover:underline">${escapeHtml(lead.website)}</a>` : "-"}
-          </td>
-          <td class="px-4 py-3 whitespace-nowrap">
-            <button type="button" onclick="openPitchModal(${idx})" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 text-xs font-medium transition">
-              View Pitch
-            </button>
-          </td>
+          <td class="px-4 py-3 text-cyan-400 max-w-xs truncate">${lead.website ? `<a href="${escapeHtml(lead.website)}" target="_blank" class="hover:underline">${escapeHtml(lead.website)}</a>` : "-"}</td>
+          <td class="px-4 py-3 whitespace-nowrap"><button type="button" onclick="openPitchModal(${idx})" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 text-xs font-medium transition">View Pitch</button></td>
         </tr>`;
       }).join("");
     }
-
     filterEmailOnly.addEventListener("change", renderTable);
 
     async function pollJob(jobId) {
       while (true) {
-        const res = await fetch(`/api/jobs/${jobId}`);
+        const res = await fetch(`/api/jobs/${jobId}`, { headers: { "Authorization": `Bearer ${getToken()}` } });
         if (!res.ok) throw new Error(`Job check failed (${res.status})`);
         const job = await res.json();
         if (job.message) loadingText.textContent = job.message;
@@ -459,9 +496,7 @@
       const gemini_api_key = geminiKeyInput.value.trim();
       localStorage.setItem(OFFER_STORAGE_KEY, offer);
       localStorage.setItem(GEMINI_STORAGE_KEY, gemini_api_key);
-      const exclude_urls = skipDuplicates
-        ? getHistory().map((l) => l.maps_url).filter(Boolean)
-        : [];
+      const exclude_urls = skipDuplicates ? getHistory().map((l) => l.maps_url).filter(Boolean) : [];
 
       errorBanner.classList.add("hidden");
       resultsSection.classList.add("hidden");
@@ -472,32 +507,29 @@
       try {
         const startRes = await fetch("/api/scrape", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ query, country, city, limit, skip_emails, offer, gemini_api_key, exclude_urls }),
         });
-
-        if (!startRes.ok) throw new Error(`Server error (${startRes.status})`);
-        const { job_id } = await startRes.json();
-        const data = await pollJob(job_id);
+        const startData = await startRes.json();
+        if (!startRes.ok) throw new Error(startData.detail || `Server error (${startRes.status})`);
+        const data = await pollJob(startData.job_id);
 
         if (!data.leads || data.leads.length === 0) {
-          errorBanner.textContent = "No new leads found for this query. Try a broader search or uncheck 'Skip Previously Captured'.";
+          errorBanner.textContent = "No new leads found for this query.";
           errorBanner.classList.remove("hidden");
           return;
         }
-
+        if (typeof data.credits === "number") document.getElementById("creditsCount").textContent = data.credits;
         currentLeads = data.leads;
         saveToHistory(currentLeads);
-
         document.getElementById("statTotal").textContent = data.total;
         document.getElementById("statEmails").textContent = data.emails_found;
         document.getElementById("downloadXlsx").href = `/api/download/${encodeURIComponent(data.xlsx_file)}`;
         document.getElementById("downloadCsv").href = `/api/download/${encodeURIComponent(data.csv_file)}`;
-
         renderTable();
         resultsSection.classList.remove("hidden");
       } catch (err) {
-        errorBanner.textContent = err.message || "Something went wrong while capturing leads.";
+        errorBanner.textContent = err.message || "Something went wrong.";
         errorBanner.classList.remove("hidden");
       } finally {
         loadingBanner.classList.add("hidden");
@@ -505,8 +537,7 @@
       }
     });
 
-    refreshHistoryUI();
-    syncServerHistory();
+    checkSession();
   </script>
 </body>
 </html>
