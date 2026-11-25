@@ -11,6 +11,25 @@ from urllib.parse import quote_plus
 import httpx
 from playwright.async_api import async_playwright, Page
 
+COUNTRY_CODES = {
+    "united states": "us",
+    "usa": "us",
+    "united kingdom": "uk",
+    "uk": "uk",
+    "canada": "ca",
+    "australia": "au",
+    "united arab emirates": "ae",
+    "uae": "ae",
+    "saudi arabia": "sa",
+    "pakistan": "pk",
+    "india": "in",
+    "germany": "de",
+    "france": "fr",
+    "turkey": "tr",
+    "singapore": "sg",
+    "malaysia": "my",
+}
+
 
 @dataclass
 class Lead:
@@ -44,23 +63,37 @@ def _normalize_url_key(url: str) -> str:
     return url.split("?")[0].strip().lower()
 
 
+def build_search_query(query: str, city: str = "", country: str = "") -> str:
+    """Combine business keyword with optional city and country for targeted Maps search."""
+    parts = [p.strip() for p in (city, country) if p and p.strip()]
+    if not parts:
+        return query.strip()
+    location = ", ".join(parts)
+    return f"{query.strip()} in {location}"
+
+
 async def scrape_google_maps_serper(
     query: str,
     limit: int = 20,
     api_key: str = "",
+    country: str = "",
     exclude_urls: set[str] | None = None,
 ) -> list[Lead]:
     """Fetch Google Maps places via Serper.dev API when an API key is provided."""
     leads: list[Lead] = []
     excluded = exclude_urls or set()
     page_num = 1
+    gl = COUNTRY_CODES.get(country.strip().lower(), "")
 
     async with httpx.AsyncClient(timeout=20.0) as client:
         while len(leads) < limit and page_num <= 10:
+            payload: dict[str, object] = {"q": query, "page": page_num}
+            if gl:
+                payload["gl"] = gl
             resp = await client.post(
                 "https://google.serper.dev/maps",
                 headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                json={"q": query, "page": page_num},
+                json=payload,
             )
             resp.raise_for_status()
             places = resp.json().get("places", [])
@@ -202,7 +235,6 @@ async def scrape_google_maps_browser(
             await browser.close()
             return []
 
-        # Scroll feed and skip already-captured URLs so repeat searches return NEW leads
         seen: set[str] = set()
         stagnant_rounds = 0
         while len(place_urls) < limit and stagnant_rounds < 6:
@@ -254,20 +286,24 @@ async def fetch_maps_leads(
     query: str,
     limit: int = 20,
     headless: bool = True,
+    country: str = "",
+    city: str = "",
     exclude_urls: set[str] | None = None,
     on_progress=None,
 ) -> list[Lead]:
     """Use Serper API if SERPER_API_KEY is configured, otherwise free Playwright scraper."""
+    full_query = build_search_query(query=query, city=city, country=country)
     api_key = os.getenv("SERPER_API_KEY", "").strip()
     if api_key:
         return await scrape_google_maps_serper(
-            query=query,
+            query=full_query,
             limit=limit,
             api_key=api_key,
+            country=country,
             exclude_urls=exclude_urls,
         )
     return await scrape_google_maps_browser(
-        query=query,
+        query=full_query,
         limit=limit,
         headless=headless,
         exclude_urls=exclude_urls,
