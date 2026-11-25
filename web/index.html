@@ -332,6 +332,7 @@
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
       refreshHistoryUI();
+    syncServerHistory();
     }
 
     function refreshHistoryUI() {
@@ -360,12 +361,26 @@
       URL.revokeObjectURL(url);
     });
 
-    clearHistoryBtn.addEventListener("click", () => {
-      if (confirm("Clear all saved leads history from this browser?")) {
+    clearHistoryBtn.addEventListener("click", async () => {
+      if (confirm("Clear all saved leads history?")) {
         localStorage.removeItem(STORAGE_KEY);
+        try { await fetch("/api/leads", { method: "DELETE" }); } catch {}
         refreshHistoryUI();
+    syncServerHistory();
       }
     });
+
+    async function syncServerHistory() {
+      try {
+        const res = await fetch("/api/leads");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.leads && data.leads.length > 0) {
+            saveToHistory(data.leads);
+          }
+        }
+      } catch {}
+    }
 
     function escapeHtml(str) {
       return (str || "").replace(/[&<>"']/g, (c) => ({
@@ -491,6 +506,7 @@
     });
 
     refreshHistoryUI();
+    syncServerHistory();
   </script>
 </body>
 </html>
