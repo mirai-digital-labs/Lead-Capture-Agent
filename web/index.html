@@ -155,14 +155,31 @@
             Show Only With Email
           </label>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3">
           <a id="downloadXlsx" href="#" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition">
             Download Excel (.xlsx)
           </a>
           <a id="downloadCsv" href="#" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 transition">
             Download CSV
           </a>
+          <button id="openWebhookBtn" type="button" class="px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-semibold text-sm border border-indigo-500/40 transition">
+            Send to Webhook / CRM
+          </button>
         </div>
+      </div>
+
+      <!-- Webhook Sync Bar -->
+      <div id="webhookBar" class="hidden bg-slate-900/80 border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 items-center">
+        <input
+          id="webhookUrl"
+          type="url"
+          placeholder="Paste n8n / Zapier / Make / Google Sheets Webhook URL (https://...)"
+          class="flex-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button id="sendWebhookBtn" type="button" class="px-5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-sm transition whitespace-nowrap">
+          Push Leads Now
+        </button>
+        <span id="webhookStatus" class="text-xs text-slate-300"></span>
       </div>
 
       <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -214,6 +231,7 @@
     const STORAGE_KEY = "lead_capture_agent_history_v1";
     const GEMINI_STORAGE_KEY = "lead_capture_agent_gemini_key";
     const OFFER_STORAGE_KEY = "lead_capture_agent_offer";
+    const WEBHOOK_STORAGE_KEY = "lead_capture_agent_webhook_url";
     const form = document.getElementById("scrapeForm");
     const submitBtn = document.getElementById("submitBtn");
     const loadingBanner = document.getElementById("loadingBanner");
@@ -231,6 +249,48 @@
 
     offerInput.value = localStorage.getItem(OFFER_STORAGE_KEY) || "";
     geminiKeyInput.value = localStorage.getItem(GEMINI_STORAGE_KEY) || "";
+    const webhookBar = document.getElementById("webhookBar");
+    const webhookUrlInput = document.getElementById("webhookUrl");
+    const webhookStatus = document.getElementById("webhookStatus");
+    const sendWebhookBtn = document.getElementById("sendWebhookBtn");
+    webhookUrlInput.value = localStorage.getItem(WEBHOOK_STORAGE_KEY) || "";
+
+    document.getElementById("openWebhookBtn").addEventListener("click", () => {
+      webhookBar.classList.toggle("hidden");
+    });
+
+    sendWebhookBtn.addEventListener("click", async () => {
+      const webhook_url = webhookUrlInput.value.trim();
+      if (!webhook_url) {
+        webhookStatus.textContent = "Please enter a valid Webhook URL.";
+        webhookStatus.className = "text-xs text-rose-400";
+        return;
+      }
+      localStorage.setItem(WEBHOOK_STORAGE_KEY, webhook_url);
+      sendWebhookBtn.disabled = true;
+      webhookStatus.textContent = "Sending...";
+      webhookStatus.className = "text-xs text-cyan-300";
+      try {
+        const res = await fetch("/api/webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            webhook_url,
+            query: document.getElementById("query").value.trim(),
+            leads: currentLeads,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed");
+        webhookStatus.textContent = `Sent ${data.sent_count} leads!`;
+        webhookStatus.className = "text-xs text-emerald-400";
+      } catch (err) {
+        webhookStatus.textContent = err.message || "Failed to send.";
+        webhookStatus.className = "text-xs text-rose-400";
+      } finally {
+        sendWebhookBtn.disabled = false;
+      }
+    });
 
     document.getElementById("closeModalBtn").addEventListener("click", () => pitchModal.classList.add("hidden"));
     document.getElementById("copyEmailBtn").addEventListener("click", () => {
