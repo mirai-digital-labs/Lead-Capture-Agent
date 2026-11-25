@@ -10,6 +10,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
+import httpx
 from pydantic import BaseModel, Field
 
 from exporter import deduplicate_leads, export_leads
@@ -157,6 +158,38 @@ async def get_job(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+class WebhookRequest(BaseModel):
+    webhook_url: str = Field(..., min_length=8, max_length=500)
+    query: str = Field(default="")
+    leads: list[dict[str, Any]] = Field(default_factory=list)
+
+
+@app.post("/api/webhook")
+async def send_to_webhook(payload: WebhookRequest) -> dict[str, Any]:
+    url = payload.webhook_url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Webhook URL must start with http:// or https://")
+    if not payload.leads:
+        raise HTTPException(status_code=400, detail="No leads to send")
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        try:
+            resp = await client.post(
+                url,
+                json={
+                    "source": "Lead Capture Agent",
+                    "query": payload.query,
+                    "count": len(payload.leads),
+                    "leads": payload.leads,
+                },
+            )
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=502, detail=f"Webhook returned HTTP {resp.status_code}")
+            return {"status": "sent", "sent_count": len(payload.leads), "remote_status": resp.status_code}
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Webhook delivery failed: {exc}") from exc
 
 
 @app.get("/api/download/{filename}")
