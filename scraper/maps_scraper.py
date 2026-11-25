@@ -42,6 +42,7 @@ class Lead:
     phone: str = ""
     website: str = ""
     emails: str = ""
+    email_status: str = ""
     address: str = ""
     facebook: str = ""
     instagram: str = ""
