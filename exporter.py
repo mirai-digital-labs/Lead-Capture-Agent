@@ -18,6 +18,7 @@ COLUMNS = [
     ("category", "Category"),
     ("phone", "Phone"),
     ("emails", "Emails"),
+    ("email_status", "Email Status"),
     ("website", "Website"),
     ("rating", "Rating"),
     ("reviews", "Reviews"),
