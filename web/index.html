@@ -213,8 +213,8 @@
     downloadAllBtn.addEventListener("click", () => {
       const history = getHistory();
       if (!history.length) return;
-      const headers = ["Business Name", "Category", "Phone", "Emails", "Website", "Rating", "Reviews", "Address", "Facebook", "Instagram", "LinkedIn", "Google Maps URL"];
-      const fields = ["name", "category", "phone", "emails", "website", "rating", "reviews", "address", "facebook", "instagram", "linkedin", "maps_url"];
+      const headers = ["Business Name", "Category", "Phone", "Emails", "Email Status", "Website", "Rating", "Reviews", "Address", "Facebook", "Instagram", "LinkedIn", "Google Maps URL"];
+      const fields = ["name", "category", "phone", "emails", "email_status", "website", "rating", "reviews", "address", "facebook", "instagram", "linkedin", "maps_url"];
       const csvRows = [headers.join(",")];
       for (const item of history) {
         csvRows.push(fields.map((f) => `"${String(item[f] || "").replace(/"/g, '""')}"`).join(","));
@@ -251,7 +251,14 @@
           </td>
           <td class="px-4 py-3 text-slate-400">${escapeHtml(lead.category) || "-"}</td>
           <td class="px-4 py-3 text-emerald-400 whitespace-nowrap">${escapeHtml(lead.phone) || "-"}</td>
-          <td class="px-4 py-3 text-amber-300">${escapeHtml(lead.emails) || "-"}</td>
+          <td class="px-4 py-3 text-amber-300">
+            <div>${escapeHtml(lead.emails) || "-"}</div>
+            ${lead.email_status === "Verified"
+              ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">MX Verified</span>`
+              : lead.email_status === "Unverified"
+              ? `<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">Unverified</span>`
+              : ""}
+          </td>
           <td class="px-4 py-3 text-cyan-400 max-w-xs truncate">
             ${lead.website ? `<a href="${escapeHtml(lead.website)}" target="_blank" class="hover:underline">${escapeHtml(lead.website)}</a>` : "-"}
           </td>
