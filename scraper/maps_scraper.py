@@ -48,6 +48,11 @@ class Lead:
     instagram: str = ""
     linkedin: str = ""
     maps_url: str = ""
+    lead_score: str = ""
+    priority: str = ""
+    ai_summary: str = ""
+    cold_email: str = ""
+    whatsapp_pitch: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
