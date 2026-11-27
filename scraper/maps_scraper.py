@@ -297,17 +297,24 @@ async def fetch_maps_leads(
     exclude_urls: set[str] | None = None,
     on_progress=None,
 ) -> list[Lead]:
-    """Use Serper API if SERPER_API_KEY is configured, otherwise free Playwright scraper."""
+    """Use Serper API if a valid SERPER_API_KEY is configured, otherwise free Playwright scraper."""
     full_query = build_search_query(query=query, city=city, country=country)
     api_key = os.getenv("SERPER_API_KEY", "").strip()
-    if api_key:
-        return await scrape_google_maps_serper(
-            query=full_query,
-            limit=limit,
-            api_key=api_key,
-            country=country,
-            exclude_urls=exclude_urls,
-        )
+    is_placeholder = api_key.lower() in {"", "none", "null", "false", "disabled", "free", "na", "n/a", "test", "0", "-"}
+
+    if api_key and not is_placeholder and len(api_key) >= 16:
+        try:
+            return await scrape_google_maps_serper(
+                query=full_query,
+                limit=limit,
+                api_key=api_key,
+                country=country,
+                exclude_urls=exclude_urls,
+            )
+        except Exception:
+            # Fall back to free browser scraper if Serper key is invalid/exhausted
+            pass
+
     return await scrape_google_maps_browser(
         query=full_query,
         limit=limit,
