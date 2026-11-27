@@ -1,5 +1,7 @@
 FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
 
+LABEL version="2.0.0"
+
 WORKDIR /app
 
 COPY requirements.txt .
