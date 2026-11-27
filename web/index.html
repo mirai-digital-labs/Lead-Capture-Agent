@@ -25,8 +25,20 @@
           <input id="authEmail" type="email" required placeholder="you@company.com" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
         </div>
         <div>
-          <label class="block text-sm text-slate-300 mb-1.5">Password (min 6 chars)</label>
-          <input id="authPassword" type="password" required minlength="6" placeholder="••••••••" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-sm text-slate-300">Password (min 6 chars)</label>
+            <button id="suggestPwBtn" type="button" class="hidden text-xs text-cyan-400 hover:underline">Suggest Strong Password</button>
+          </div>
+          <div class="relative">
+            <input id="authPassword" type="password" required minlength="6" autocomplete="current-password" placeholder="••••••••" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 pr-16 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+            <button id="togglePwBtn" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-1.5 py-0.5 rounded">Show</button>
+          </div>
+          <div id="pwStrengthWrap" class="hidden mt-2 flex items-center justify-between text-xs">
+            <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden mr-3">
+              <div id="pwStrengthBar" class="h-full w-0 transition-all duration-200"></div>
+            </div>
+            <span id="pwStrengthText" class="text-slate-400"></span>
+          </div>
         </div>
         <div id="authError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2.5"></div>
         <button id="authSubmitBtn" type="submit" class="w-full rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-2.5 transition">
@@ -251,6 +263,52 @@
     const authForm = document.getElementById("authForm");
     const authError = document.getElementById("authError");
     const authSubmitBtn = document.getElementById("authSubmitBtn");
+    const authPassword = document.getElementById("authPassword");
+    const togglePwBtn = document.getElementById("togglePwBtn");
+    const suggestPwBtn = document.getElementById("suggestPwBtn");
+    const pwStrengthWrap = document.getElementById("pwStrengthWrap");
+    const pwStrengthBar = document.getElementById("pwStrengthBar");
+    const pwStrengthText = document.getElementById("pwStrengthText");
+
+    function updatePasswordStrength(pw) {
+      let score = 0;
+      if (pw.length >= 8) score++;
+      if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+      if (/\d/.test(pw)) score++;
+      if (/[^A-Za-z0-9]/.test(pw)) score++;
+      const levels = [
+        { w: "25%", cls: "bg-rose-500", label: "Weak", txt: "text-rose-400" },
+        { w: "50%", cls: "bg-amber-500", label: "Fair", txt: "text-amber-400" },
+        { w: "75%", cls: "bg-cyan-500", label: "Good", txt: "text-cyan-400" },
+        { w: "100%", cls: "bg-emerald-500", label: "Strong", txt: "text-emerald-400" },
+      ];
+      const idx = Math.max(0, Math.min(3, score - 1));
+      if (!pw) { pwStrengthBar.style.width = "0%"; pwStrengthText.textContent = ""; return; }
+      pwStrengthBar.className = `h-full transition-all duration-200 ${levels[idx].cls}`;
+      pwStrengthBar.style.width = levels[idx].w;
+      pwStrengthText.className = levels[idx].txt;
+      pwStrengthText.textContent = levels[idx].label;
+    }
+
+    togglePwBtn.addEventListener("click", () => {
+      const isHidden = authPassword.type === "password";
+      authPassword.type = isHidden ? "text" : "password";
+      togglePwBtn.textContent = isHidden ? "Hide" : "Show";
+    });
+
+    suggestPwBtn.addEventListener("click", () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*";
+      let generated = "";
+      const arr = new Uint32Array(14);
+      crypto.getRandomValues(arr);
+      for (const n of arr) generated += chars[n % chars.length];
+      authPassword.value = generated;
+      authPassword.type = "text";
+      togglePwBtn.textContent = "Hide";
+      updatePasswordStrength(generated);
+    });
+
+    authPassword.addEventListener("input", () => updatePasswordStrength(authPassword.value));
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
     function authHeaders() { return { "Authorization": `Bearer ${getToken()}`, "Content-Type": "application/json" }; }
@@ -260,6 +318,9 @@
       tabLogin.className = mode === "login" ? "flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-slate-950" : "flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400";
       tabRegister.className = mode === "register" ? "flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-slate-950" : "flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400";
       authSubmitBtn.textContent = mode === "login" ? "Login" : "Create Account";
+      authPassword.autocomplete = mode === "login" ? "current-password" : "new-password";
+      suggestPwBtn.classList.toggle("hidden", mode !== "register");
+      pwStrengthWrap.classList.toggle("hidden", mode !== "register");
       authError.classList.add("hidden");
     }
     tabLogin.addEventListener("click", () => setAuthTab("login"));
